@@ -1,40 +1,59 @@
 import socket
 import threading
 
-# Lock for thread-safe printing
+# Set default timeout
+socket.setdefaulttimeout(1)
+
+# Thread lock for clean output
 lock = threading.Lock()
 
-# Function to scan a single port
-def scan_port(target, port):
+# Common ports (faster + realistic scanning)
+common_ports = [21, 22, 23, 25, 53, 80, 110, 139, 143, 443, 445, 8080]
+
+
+# Resolve domain to IP
+def resolve_target(target):
+    try:
+        return socket.gethostbyname(target)
+    except socket.gaierror:
+        print(f"[!] Could not resolve {target}")
+        return None
+
+
+# Scan a single port
+def scan_port(target_ip, port):
     try:
         s = socket.socket(socket.AF_INET, socket.SOCK_STREAM)
-        s.settimeout(1)
-        result = s.connect_ex((target, port))
-        
+        result = s.connect_ex((target_ip, port))
+
         if result == 0:
+            try:
+                service = socket.getservbyport(port)
+            except:
+                service = "Unknown"
+
             with lock:
-                print(f"[OPEN] Port {port}")
-        
+                print(f"[OPEN] Port {port} ({service})")
+
         s.close()
     except:
         pass
 
-# Main scanner function
+
+# Main function
 def start_scan():
     target = input("Enter target (IP or domain): ")
-    
-    try:
-        target_ip = socket.gethostbyname(target)
-    except socket.gaierror:
-        print("Invalid target!")
+    target_ip = resolve_target(target)
+
+    if not target_ip:
         return
 
-    print(f"\nScanning target: {target_ip}")
-    print("Scanning ports...\n")
+    print(f"\n[+] Target resolved: {target_ip}")
+    print("[*] Scanning common ports...\n")
 
     threads = []
 
-    for port in range(1, 1025):  # Scan ports 1–1024
+    for port in common_ports:
         t = threading.Thread(target=scan_port, args=(target_ip, port))
         threads.append(t)
         t.start()
@@ -42,7 +61,9 @@ def start_scan():
     for t in threads:
         t.join()
 
-    print("\nScan completed!")
+    print("\n[✓] Scan completed!")
 
+
+# Run program
 if __name__ == "__main__":
     start_scan()
